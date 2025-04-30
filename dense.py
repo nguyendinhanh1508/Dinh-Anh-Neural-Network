@@ -24,3 +24,6 @@ class Dense(Layer):
         self.weights -= learning_rate * weights_gradient
         param_storage.update_bias(self.layer_id, learning_rate * output_gradient)
         return input_gradient
+    
+    def load_weights(self):
+        self.weights = param_storage.get_weights(self.layer_id)

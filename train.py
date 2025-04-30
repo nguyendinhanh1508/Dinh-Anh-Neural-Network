@@ -10,7 +10,6 @@ from activations import Tanh, Sigmoid, Softmax
 from losses import binary_cross_entropy, binary_cross_entropy_prime, cross_entropy, cross_entropy_prime
 
 def preprocess_data(x, y, limit):
-    # Get equal samples for all digits 0-9
     indices = []
     for i in range(10):
         idx = np.where(y == i)[0][:limit]
@@ -19,8 +18,8 @@ def preprocess_data(x, y, limit):
     x, y = x[indices], y[indices]
     x = x.reshape(len(x), 1, 28, 28)
     x = x.astype("float32") / 255
-    y = to_categorical(y, num_classes=10)  # Now 10 classes
-    y = y.reshape(len(y), 10, 1)  # Output shape is now (10, 1)
+    y = to_categorical(y, num_classes=10)
+    y = y.reshape(len(y), 10, 1)
     return x, y
 
 def calculate_accuracy(network, x, y):
@@ -33,28 +32,30 @@ def calculate_accuracy(network, x, y):
             correct += 1
     return correct / len(x) * 100
 
-# Load more data since we're classifying more digits
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
-x_train, y_train = preprocess_data(x_train, y_train, 100)  # 100 samples per digit
-x_test, y_test = preprocess_data(x_test, y_test, 50)  # 50 test samples per digit
+x_train, y_train = preprocess_data(x_train, y_train, 100)
+x_test, y_test = preprocess_data(x_test, y_test, 50)
 
 network = [
-    Convolutional((1, 28, 28), 3, 5),  # Input: 1 channel, 28x28, 3x3 kernel, 5 filters
-    Tanh(),  # Using Tanh for better gradient flow
+    Convolutional((1, 28, 28), 3, 5),
+    Tanh(),
     Reshape((5, 26, 26), (5 * 26 * 26, 1)),
     Dense(5 * 26 * 26, 100),
     Tanh(),
-    Dense(100, 10),  # Output layer now has 10 neurons
-    Softmax()  # Use Softmax for multi-class classification
+    Dense(100, 10),
+    Softmax()
 ]
 
-# if param_storage.load(network):
-#     initial_acc = calculate_accuracy(network, x_test, y_test)
-#     print(f"Loaded previous biases. Initial test accuracy: {initial_acc:.2f}%")
-# else:
-#     print("No previous biases found. Starting fresh.")
+if param_storage.load():
+    for layer in network:
+        if hasattr(layer, 'layer_id'):
+            layer.load_weights()
+    initial_acc = calculate_accuracy(network, x_test, y_test)
+    print(f"Loaded previous state. Initial test accuracy: {initial_acc:.2f}%")
+else:
+    print("No previous state found.")
 
-epochs = 20
+epochs = 1000
 learning_rate = 0.01
 
 for e in range(epochs):
@@ -64,7 +65,7 @@ for e in range(epochs):
         for layer in network:
             output = layer.forward(output)
         
-        error += cross_entropy(y, output)  # Using cross_entropy instead of binary_cross_entropy
+        error += cross_entropy(y, output)
 
         grad = cross_entropy_prime(y, output)
         for layer in reversed(network):
@@ -72,6 +73,7 @@ for e in range(epochs):
         
     error /= len(x_train)
     print(f"{e + 1}/{epochs}, error = {error}")
+    param_storage.save()
 
 tests = 0
 correct = 0
@@ -80,10 +82,8 @@ for x, y in zip(x_test, y_test):
     output = x
     for layer in network:
         output = layer.forward(output)
-    print(f"pred: {np.argmax(output)}, true: {np.argmax(y)}")
     tests += 1
     if np.argmax(output) == np.argmax(y):
         correct += 1
         
-# param_storage.save(network)
-print(f"accuracy {correct / tests * 100}%")
+print(f"Training finished, current accuracy: {correct / tests * 100}%")

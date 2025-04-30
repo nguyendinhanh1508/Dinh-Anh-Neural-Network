@@ -6,8 +6,8 @@ class ParamStorage:
     def __init__(self):
         self.storage = {
             'biases': {},
-            'weights': {},  # Add weight storage
-            'metadata': {}  # Store network architecture info
+            'weights': {},
+            'metadata': {}
         }
         self.next_id = 0
     
@@ -35,35 +35,39 @@ class ParamStorage:
         return self.storage['weights'][layer_id]
     
     def save(self, filename='network_state.npz'):
-        # Convert numpy arrays to lists for metadata
-        metadata = {k: {**v, 'shape': list(v['shape'])} 
-                   for k, v in self.storage['metadata'].items()}
-        
+        serializable_metadata = {}
+        for k, v in self.storage['metadata'].items():
+            serializable_metadata[k] = {
+                'shape': list(v['shape']),
+                'type': v['type'],
+                'params': v['params']
+            }
         np.savez(
             filename,
             biases=self.storage['biases'],
             weights=self.storage['weights'],
-            metadata=json.dumps(metadata)  # Save metadata as JSON string
+            metadata=json.dumps(serializable_metadata)
         )
     
     def load(self, filename='network_state.npz'):
         if os.path.exists(filename):
-            data = np.load(filename, allow_pickle=True)
-            self.storage['biases'] = dict(enumerate(data['biases'])) if data['biases'].size > 0 else {}
-            self.storage['weights'] = dict(enumerate(data['weights'])) if data['weights'].size > 0 else {}
-            self.storage['metadata'] = json.loads(str(data['metadata']))
-            if 'metadata' in data:
-                metadata_str = str(data['metadata']) if isinstance(data['metadata'], np.ndarray) else data['metadata']
+            try:
+                data = np.load(filename, allow_pickle=True)
+                self.storage['biases'] = {int(k): v for k, v in data['biases'].item().items()}
+                self.storage['weights'] = {int(k): v for k, v in data['weights'].item().items()}
+                metadata_str = data['metadata'].item() if isinstance(data['metadata'], np.ndarray) else data['metadata']
                 self.storage['metadata'] = json.loads(metadata_str)
                 for k, v in self.storage['metadata'].items():
                     if 'shape' in v:
                         v['shape'] = tuple(v['shape'])
-            if self.storage['biases']:
-                self.next_id = max(map(int, self.storage['biases'].keys())) + 1
-            else:
-                self.next_id = 0
-
-            return True
+                if self.storage['biases']:
+                    self.next_id = max(map(int, self.storage['biases'].keys())) + 1
+                else:
+                    self.next_id = 0
+                return True
+            except Exception as e:
+                print(f"Error loading saved state: {e}")
+                return False
         return False
 
 param_storage = ParamStorage()
