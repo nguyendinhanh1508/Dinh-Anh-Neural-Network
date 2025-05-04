@@ -55,8 +55,8 @@ if param_storage.load():
 else:
     print("No previous state found.")
 
-epochs = 1000
-learning_rate = 0.01
+epochs = 100
+learning_rate = 0.001
 
 for e in range(epochs):
     error = 0
